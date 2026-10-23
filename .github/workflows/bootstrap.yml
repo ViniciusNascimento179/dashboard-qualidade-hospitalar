@@ -1,7 +1,3 @@
-ap.yml
-
-
-name: Bootstrap do projeto
 on:
   workflow_dispatch:
   push:
@@ -12,25 +8,31 @@ permissions:
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('bootstrap-inspecoes.zip') != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Extrair projeto (zip interno), limpar raiz e organizar
+        if: ${{ hashFiles('bootstrap-inspecoes.zip') != '' }}
         run: |
           unzip -o bootstrap-inspecoes.zip -d _b
           unzip -o _b/dashboard-inspecoes-projeto.zip -d _projeto
           find . -mindepth 1 -maxdepth 1 ! -name '.github' ! -name '_b' ! -name '_projeto' -exec rm -rf {} +
           rsync -a _projeto/ ./
-          rm -rf _b _projeto bootstrap-inspecoes.zip .github/workflows/bootstrap.yml
+          rm -rf _b _projeto
       - name: Processar planilha
+        if: ${{ hashFiles('bootstrap-inspecoes.zip') != '' }}
         run: |
           pip install -r requirements.txt
           python scripts/processa_dados.py
       - name: Commit e push
+        if: ${{ hashFiles('bootstrap-inspecoes.zip') != '' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          rm -f bootstrap-inspecoes.zip .github/workflows/bootstrap.yml
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: bootstrap do projeto (estrutura completa)"
+          git pushsers.noreply.github.com"
           git add -A
           git diff --cached --quiet || git commit -m "chore: bootstrap do projeto (estrutura completa)"
           git push
