@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qualidade — Inspeções das Instalações (GUT)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f1f5f9; --card: #ffffff; --ink: #0f172a; --muted: #64748b;
+    --ok: #16a34a; --bad: #dc2626; --warn: #d97706; --info: #2563eb; --line: #e2e8f0;
+    --brand: #1e3a5f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--ink); padding: 24px; }
+  header { margin-bottom: 20px; }
+  h1 { font-size: 1.5rem; color: var(--brand); }
+  header p { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+  .filtros { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .filtros label { font-size: .8rem; color: var(--muted); display: block; margin-bottom: 4px; }
+  .filtros select { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); font-size: .9rem; min-width: 165px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .kpi .rotulo { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .kpi .valor { font-size: 1.9rem; font-weight: 700; margin-top: 4px; }
+  .kpi .detalhe { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+  .kpi.ok .valor { color: var(--ok); }
+  .kpi.bad .valor { color: var(--bad); }
+  .kpi.warn .valor { color: var(--warn); }
+  .kpi.info .valor { color: var(--info); }
+  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 14px; margin-bottom: 14px; }
+  .painel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .painel h2 { font-size: 1rem; margin-bottom: 12px; color: var(--brand); }
+  .canvas-wrap { position: relative; height: 280px; }
+  .painel.tabela { grid-column: 1 / -1; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th { text-align: left; padding: 8px 10px; background: #f8fafc; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line); position: sticky; top: 0; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.apont { max-width: 400px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: .72rem; font-weight: 600; white-space: nowrap; }
+  .badge.ok { background: #dcfce7; color: var(--ok); }
+  .badge.bad { background: #fee2e2; color: var(--bad); }
+  .badge.warn { background: #fef3c7; color: var(--warn); }
+  .badge.info { background: #dbeafe; color: var(--info); }
+  .badge.mut { background: #f1f5f9; color: var(--muted); }
+  .vazio { text-align: center; color: var(--muted); padding: 40px; }
+  footer { color: var(--muted); font-size: .8rem; margin-top: 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏥 Inspeções das Instalações — Apontamentos GUT</h1>
+  <p id="subtitulo">Carregando…</p>
+</header>
+
+<div class="filtros">
+  <div><label for="f-andar">Andar</label><select id="f-andar"><option value="">Todos</option></select></div>
+  <div><label for="f-ala">Ala</label><select id="f-ala"><option value="">Todos</option></select></div>
+  <div><label for="f-setor">Setor</label><select id="f-setor"><option value="">Todos</option></select></div>
+  <div><label for="f-resp">Setor responsável</label><select id="f-resp"><option value="">Todos</option></select></div>
+  <div><label for="f-status">Status</label>
+    <select id="f-status">
+      <option value="">Todos</option><option value="Em andamento">Em andamento</option>
+      <option value="Concluído">Concluído</option>
+    </select>
+  </div>
+  <div><label for="f-periodo">Registro a partir de</label>
+    <select id="f-periodo">
+      <option value="0">Tudo</option><option value="90">Últimos 90 dias</option>
+      <option value="365">Últimos 12 meses</option><option value="730">Últimos 24 meses</option>
+    </select>
+  </div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="rotulo">Apontamentos</div><div class="valor" id="kpi-total">—</div><div class="detalhe" id="kpi-total-detalhe"></div></div>
+  <div class="kpi ok"><div class="rotulo">Concluídos</div><div class="valor" id="kpi-conc">—</div><div class="detalhe" id="kpi-conc-detalhe"></div></div>
+  <div class="kpi info"><div class="rotulo">Em andamento</div><div class="valor" id="kpi-and">—</div><div class="detalhe" id="kpi-and-detalhe"></div></div>
+  <div class="kpi bad"><div class="rotulo">Atrasados</div><div class="valor" id="kpi-atras">—</div><div class="detalhe">prazo vencido sem conclusão</div></div>
+  <div class="kpi warn"><div class="rotulo">Prioridade alta</div><div class="valor" id="kpi-alta">—</div><div class="detalhe" id="kpi-alta-detalhe"></div></div>
+</div>
+
+<div class="grade">
+  <div class="painel"><h2>Apontamentos por mês</h2><div class="canvas-wrap"><canvas id="g-mes"></canvas></div></div>
+  <div class="painel"><h2>Status geral</h2><div class="canvas-wrap"><canvas id="g-status"></canvas></div></div>
+  <div class="painel"><h2>Atrasos por setor responsável</h2><div class="canvas-wrap"><canvas id="g-resp"></canvas></div></div>
+  <div class="painel"><h2>Em aberto por setor inspecionado</h2><div class="canvas-wrap"><canvas id="g-setor"></canvas></div></div>
+  <div class="painel"><h2>Em aberto por andar</h2><div class="canvas-wrap"><canvas id="g-andar"></canvas></div></div>
+  <div class="painel"><h2>Prioridade GUT (em aberto)</h2><div class="canvas-wrap"><canvas id="g-prio"></canvas></div></div>
+  <div class="painel"><h2>Em aberto por categoria FMS</h2><div class="canvas-wrap"><canvas id="g-cat"></canvas></div></div>
+  <div class="painel"><h2>Inspeções por mês (quantidade)</h2><div class="canvas-wrap"><canvas id="g-insp"></canvas></div></div>
+  <div class="painel tabela">
+    <h2>Prioridade alta em aberto</h2>
+    <div id="tabela-alta"></div>
+  </div>
+</div>
+
+<footer id="rodape"></footer>
+
+<script src="data.js"></script>
+<script>
+const D = window.DASH || { linhas: [], inspecoes: [], setores: [], andares: [] };
+const HOJE = new Date();
+
+function preencher(sel, valores) {
+  valores.forEach(v => {
+    const o = document.createElement("option");
+    o.value = v; o.textContent = v;
+    sel.appendChild(o);
+  });
+}
+const respSetores = [...new Set(D.linhas.map(l => l.responsavel_setor).filter(v => v && v !== "Não informado"))].sort();
+const alas = [...new Set(D.linhas.map(l => l.ala).filter(v => v))].sort();
+preencher(document.getElementById("f-andar"), D.andares);
+preencher(document.getElementById("f-ala"), alas);
+preencher(document.getElementById("f-setor"), D.setores);
+preencher(document.getElementById("f-resp"), respSetores);
+
+function filtrar() {
+  const andar = document.getElementById("f-andar").value;
+  const ala = document.getElementById("f-ala").value;
+  const setor = document.getElementById("f-setor").value;
+  const resp = document.getElementById("f-resp").value;
+  const status = document.getElementById("f-status").value;
+  const dias = parseInt(document.getElementById("f-periodo").value, 10);
+  const limite = dias > 0 ? new Date(HOJE.getTime() - dias * 864e5) : null;
+  return D.linhas.filter(l => {
+    if (andar && l.andar !== andar) return false;
+    if (ala && l.ala !== ala) return false;
+    if (setor && l.setor !== setor) return false;
+    if (resp && l.responsavel_setor !== resp) return false;
+    if (status && l.status !== status) return false;
+    if (limite && new Date(l.data + "T12:00:00") < limite) return false;
+    return true;
+  });
+}
+
+function fmtData(iso) {
+  if (!iso) return "—";
+  const [a, m, d] = iso.split("-");
+  return `${d}/${m}/${a}`;
+}
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+let graficos = {};
+function desenhar(id, cfg) {
+  if (graficos[id]) graficos[id].destroy();
+  graficos[id] = new Chart(document.getElementById(id), cfg);
+}
+
+function atualizar() {
+  const linhas = filtrar();
+  const total = linhas.length;
+  const conc = linhas.filter(l => l.status === "Concluído");
+  const andam = linhas.filter(l => l.status !== "Concluído" && l.status !== "Cancelado");
+  const atras = andam.filter(l => l.status_prazo === "Atrasado");
+  const altaAberta = andam.filter(l => l.prioridade === "Alta");
+  const altaTotal = linhas.filter(l => l.prioridade === "Alta");
+  const pctConc = total ? (conc.length / total * 100) : 0;
+
+  document.getElementById("subtitulo").textContent =
+    `Dados atualizados em ${D.gerado_em} · fonte: ${D.fonte} · participantes anonimizados`;
+  document.getElementById("kpi-total").textContent = total;
+  document.getElementById("kpi-total-detalhe").textContent = `${D.inspecoes.length} inspeções na base`;
+  document.getElementById("kpi-conc").textContent = conc.length;
+  document.getElementById("kpi-conc-detalhe").textContent = pctConc.toFixed(1).replace(".", ",") + "% do total";
+  document.getElementById("kpi-and").textContent = andam.length;
+  document.getElementById("kpi-and-detalhe").textContent = "ações a executar";
+  document.getElementById("kpi-atras").textContent = atras.length;
+  document.getElementById("kpi-alta").textContent = altaAberta.length;
+  document.getElementById("kpi-alta-detalhe").textContent = `${altaTotal.length} no total (GUT alta/imediata)`;
+  document.getElementById("rodape").textContent =
+    `Dashboard Qualidade · Inspeções das Instalações · gerado em ${D.gerado_em}`;
+
+  // por mês
+  const meses = {};
+  linhas.forEach(l => {
+    const k = l.data.slice(0, 7);
+    meses[k] = meses[k] || { c: 0, a: 0 };
+    if (l.status === "Concluído") meses[k].c++; else meses[k].a++;
+  });
+  const ks = Object.keys(meses).sort();
+  const rot = ks.map(k => { const [a, m] = k.split("-"); return `${m}/${a.slice(2)}`; });
+  desenhar("g-mes", {
+    type: "bar",
+    data: {
+      labels: rot,
+      datasets: [
+        { label: "Concluídos", data: ks.map(k => meses[k].c), backgroundColor: "#16a34a", stack: "s" },
+        { label: "Em andamento", data: ks.map(k => meses[k].a), backgroundColor: "#2563eb", stack: "s" }
+      ]
+    },
+    options: { maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
+  });
+
+  // status geral
+  desenhar("g-status", {
+    type: "doughnut",
+    data: { labels: ["Concluídos", "Em andamento"], datasets: [{ data: [conc.length, andam.length], backgroundColor: ["#16a34a", "#2563eb"] }] },
+    options: { maintainAspectRatio: false, cutout: "60%" }
+  });
+
+  // atrasos por responsável
+  const porResp = {};
+  atras.forEach(l => { porResp[l.responsavel_setor] = (porResp[l.responsavel_setor] || 0) + 1; });
+  const topResp = Object.entries(porResp).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  desenhar("g-resp", {
+    type: "bar",
+    data: { labels: topResp.map(t => t[0]), datasets: [{ label: "Atrasados", data: topResp.map(t => t[1]), backgroundColor: "#dc2626" }] },
+    options: { indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // em aberto por setor
+  const porSetor = {};
+  andam.forEach(l => { porSetor[l.setor] = (porSetor[l.setor] || 0) + 1; });
+  const topSetor = Object.entries(porSetor).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  desenhar("g-setor", {
+    type: "bar",
+    data: { labels: topSetor.map(t => t[0]), datasets: [{ label: "Em aberto", data: topSetor.map(t => t[1]), backgroundColor: "#d97706" }] },
+    options: { indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // em aberto por andar
+  const porAndar = {};
+  andam.forEach(l => { const a = l.andar || "Não informado"; porAndar[a] = (porAndar[a] || 0) + 1; });
+  const ordAndar = Object.entries(porAndar).sort((a, b) => b[1] - a[1]);
+  desenhar("g-andar", {
+    type: "bar",
+    data: { labels: ordAndar.map(t => t[0]), datasets: [{ label: "Em aberto", data: ordAndar.map(t => t[1]), backgroundColor: "#7c3aed" }] },
+    options: { indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // prioridade GUT
+  const pr = { "Alta": 0, "Moderada": 0, "Baixa": 0, "Sem avaliação": 0 };
+  andam.forEach(l => { pr[l.prioridade] = (pr[l.prioridade] || 0) + 1; });
+  desenhar("g-prio", {
+    type: "doughnut",
+    data: { labels: Object.keys(pr), datasets: [{ data: Object.values(pr), backgroundColor: ["#dc2626", "#d97706", "#16a34a", "#94a3b8"] }] },
+    options: { maintainAspectRatio: false, cutout: "55%" }
+  });
+
+  // categorias FMS
+  const cats = {};
+  andam.forEach(l => { const c = l.categoria || "Não informado"; cats[c] = (cats[c] || 0) + 1; });
+  const topCats = Object.entries(cats).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  desenhar("g-cat", {
+    type: "bar",
+    data: { labels: topCats.map(t => t[0]), datasets: [{ label: "Em aberto", data: topCats.map(t => t[1]), backgroundColor: "#0d9488" }] },
+    options: { indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // inspeções por mês
+  const inspMes = {};
+  D.inspecoes.forEach(x => { const k = x.data.slice(0, 7); inspMes[k] = (inspMes[k] || 0) + 1; });
+  const ksI = Object.keys(inspMes).sort();
+  const rotI = ksI.map(k => { const [a, m] = k.split("-"); return `${m}/${a.slice(2)}`; });
+  desenhar("g-insp", {
+    type: "line",
+    data: { labels: rotI, datasets: [{ label: "Inspeções realizadas", data: ksI.map(k => inspMes[k]), borderColor: "#1e3a5f", backgroundColor: "rgba(30,58,95,.15)", fill: true, tension: .3 }] },
+    options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // tabela prioridade alta em aberto
+  const ordem = { "Alta": 0 };
+  const lista = altaAberta.slice().sort((a, b) => (a.prazo || "9999") < (b.prazo || "9999") ? -1 : 1);
+  const el = document.getElementById("tabela-alta");
+  if (!lista.length) {
+    el.innerHTML = '<div class="vazio">🎉 Nenhuma prioridade alta em aberto neste filtro.</div>';
+  } else {
+    const linhasHtml = lista.slice(0, 60).map(l => `<tr>
+      <td>${l.id ?? "—"}</td>
+      <td>${fmtData(l.data)}</td>
+      <td>${esc(l.setor)}</td>
+      <td>${esc(l.andar || "—")}</td>
+      <td class="apont">${esc((l.apontamento || "—").slice(0, 130))}${l.apontamento && l.apontamento.length > 130 ? "…" : ""}</td>
+      <td>${esc(l.responsavel_setor)}</td>
+      <td>${fmtData(l.prazo)}</td>
+      <td><span class="badge bad">GUT ${l.gut}</span></td>
+    </tr>`).join("");
+    el.innerHTML = `<table>
+      <thead><tr><th>ID</th><th>Registro</th><th>Setor</th><th>Andar</th><th>Apontamento</th><th>Responsável</th><th>Prazo</th><th>GUT</th></tr></thead>
+      <tbody>${linhasHtml}</tbody>
+    </table>
+    ${lista.length > 60 ? `<p style="color:var(--muted);font-size:.8rem;margin-top:8px">Mostrando 60 de ${lista.length}.</p>` : ""}`;
+  }
+}
+
+["f-andar", "f-ala", "f-setor", "f-resp", "f-status", "f-periodo"].forEach(id =>
+  document.getElementById(id).addEventListener("change", atualizar));
+atualizar();
+</script>
+</body>
+</html>
