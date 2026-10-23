@@ -17,7 +17,7 @@ jobs:
           if [ -f bootstrap-inspecoes.zip ]; then
             unzip -o bootstrap-inspecoes.zip -d _b
             unzip -o _b/dashboard-inspecoes-projeto.zip -d _projeto
-            find . -mindepth 1 -maxdepth 1 ! -name '.github' ! -name '_b' ! -name '_projeto' -exec rm -rf {} +
+             find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' ! -name '_b' ! -name '_projeto' -exec rm -rf {} +
             cp -a _projeto/. ./
             rm -rf _b _projeto bootstrap-inspecoes.zip
             python -m pip install -r requirements.txt
