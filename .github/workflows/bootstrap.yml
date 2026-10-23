@@ -1,17 +1,22 @@
+name: Bootstrap do projeto
+
 on:
   workflow_dispatch:
   push:
 permissions:
+
   contents: write
   workflows: write
   pages: write
   id-token: write
+  
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        
       - name: Bootstrap (extrai, organiza, processa e commita)
         run: |
           if [ -f bootstrap-inspecoes.zip ]; then
