@@ -3,6 +3,7 @@ on:
   push:
 permissions:
   contents: write
+  workflows: write
   pages: write
   id-token: write
 jobs:
